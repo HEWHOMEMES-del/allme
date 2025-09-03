@@ -1,0 +1,280 @@
+expo install @stripe/stripe-react-native
+
+
+
+import React from 'react';
+import { View, Button, StyleSheet, Alert } from 'react-native';
+import { CardField, useStripe } from '@stripe/stripe-react-native';
+
+export default function PaymentScreen() {
+  const { confirmPayment } = useStripe();
+
+  const clientSecret = '<YOUR_PAYMENT_INTENT_CLIENT_SECRET_FROM_BACKEND>';
+
+  const handlePayPress = async () => {
+    const { paymentIntent, error } = await confirmPayment(clientSecret, {
+      type: 'Card',
+    });
+
+    if (error) {
+      Alert.alert('Payment failed', error.message);
+    } else if (paymentIntent) {
+      Alert.alert('Payment successful', `PaymentIntent status: ${paymentIntent.status}`);
+      // Unlock premium content here
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <CardField
+        postalCodeEnabled={false}
+        placeholders={{ number: '4242 4242 4242 4242' }}
+        cardStyle={styles.card}
+        style={styles.cardContainer}
+        onCardChange={(cardDetails) => {
+          // Optional: handle card changes
+        }}
+      />
+      <Button onPress={handlePayPress} title="Pay R150" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  card: { backgroundColor: '#FFFFFF', textColor: '#000000' },
+  cardContainer: { height: 50, marginVertical: 30 },
+});
+
+
+
+
+
+
+
+
+2. PayFast Integration (SA EFT, Cards)
+PayFast does not have an official React Native SDK, but you can integrate it using their HTML form method inside a WebView or redirect to their payment page.
+
+a) Install WebView
+bash
+Copy
+Edit
+expo install react-native-webview
+b) Example PayFast WebView component
+tsx
+Copy
+Edit
+import React from 'react';
+import { WebView } from 'react-native-webview';
+
+export default function PayFastPayment() {
+  const payfastUrl = 'https://www.payfast.co.za/eng/process?...'; // Your payment URL with parameters
+
+  return <WebView source={{ uri: payfastUrl }} style={{ flex: 1 }} />;
+}
+You’ll have to build your PayFast payment URL with all required parameters like amount, merchant ID, return URLs, etc. Server-side signature calculation is recommended for security.
+
+3. Google Play Billing (Android In-App Purchases)
+Use Expo’s in-app-purchases module.
+
+bash
+Copy
+Edit
+expo install expo-in-app-purchases
+Basic usage:
+
+tsx
+Copy
+Edit
+import * as InAppPurchases from 'expo-in-app-purchases';
+
+async function connectToStore() {
+  await InAppPurchases.connectAsync();
+  const items = await InAppPurchases.getProductsAsync(['premium_package']);
+  // Show purchase button
+}
+
+async function purchaseItem() {
+  await InAppPurchases.purchaseItemAsync('premium_package');
+}
+
+// Listen to purchase updates and grant premium access accordingly
+Set up your product IDs in the Google Play Console.
+
+4. Apple In-App Purchase (iOS)
+Also use expo-in-app-purchases for iOS.
+
+Make sure to create in-app purchase products in App Store Connect and use the correct product IDs.
+
+Summary
+Stripe: Best for card payments anywhere
+
+PayFast: Popular SA payment gateway for EFT and cards (via WebView)
+
+Google Play Billing & Apple IAP: For native in-app purchases on Android/iOS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Step 1: Install all needed dependencies
+bash
+Copy
+Edit
+expo install @stripe/stripe-react-native react-native-webview expo-in-app-purchases
+Step 2: Create PaymentScreen.tsx with all payment options
+tsx
+Copy
+Edit
+import React, { useEffect, useState } from 'react';
+import { View, Button, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
+import { CardField, useStripe } from '@stripe/stripe-react-native';
+import WebView from 'react-native-webview';
+import * as InAppPurchases from 'expo-in-app-purchases';
+
+export default function PaymentScreen({ onSuccess }: { onSuccess: () => void }) {
+  const { confirmPayment } = useStripe();
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [showPayFast, setShowPayFast] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedRole, setSelectedRole] = useState<'student' | 'parent' | 'teacher'>('student');
+
+  // Replace with your backend endpoint to create Stripe PaymentIntent
+  const fetchPaymentIntent = async () => {
+    try {
+      const res = await fetch('https://your-backend.com/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 15000 }), // Amount in cents (R150)
+      });
+      const data = await res.json();
+      setClientSecret(data.clientSecret);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to fetch payment info.');
+    }
+  };
+
+  // Expo In-App Purchases connection
+  useEffect(() => {
+    InAppPurchases.connectAsync();
+    InAppPurchases.getProductsAsync(['premium_package']);
+    const subscription = InAppPurchases.setPurchaseListener(({ responseCode, results }) => {
+      if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+        results.forEach(purchase => {
+          if (!purchase.acknowledged) {
+            InAppPurchases.finishTransactionAsync(purchase, true);
+            Alert.alert('Purchase successful', 'Premium content unlocked!');
+            onSuccess();
+          }
+        });
+      }
+    });
+    return () => {
+      subscription.remove();
+      InAppPurchases.disconnectAsync();
+    };
+  }, []);
+
+  // Handle Stripe payment
+  const handleStripePay = async () => {
+    if (!clientSecret) {
+      await fetchPaymentIntent();
+    }
+    const { paymentIntent, error } = await confirmPayment(clientSecret!, {
+      type: 'Card',
+    });
+
+    if (error) {
+      Alert.alert('Payment failed', error.message);
+    } else if (paymentIntent) {
+      Alert.alert('Payment successful', `PaymentIntent status: ${paymentIntent.status}`);
+      onSuccess();
+    }
+  };
+
+  // Launch Google Play or Apple purchase
+  const handleInAppPurchase = async () => {
+    await InAppPurchases.purchaseItemAsync('premium_package');
+  };
+
+  if (showPayFast) {
+    const payfastUrl = 'https://www.payfast.co.za/eng/process?...'; // Build with params server-side
+    return <WebView source={{ uri: payfastUrl }} style={{ flex: 1 }} />;
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Unlock Premium Content (R150)</Text>
+
+      <CardField
+        postalCodeEnabled={false}
+        placeholders={{ number: '4242 4242 4242 4242' }}
+        cardStyle={styles.card}
+        style={styles.cardContainer}
+        onCardChange={() => {}}
+      />
+
+      <Button title="Pay with Card (Stripe)" onPress={handleStripePay} />
+
+      <View style={{ marginVertical: 20 }}>
+        <Button title="Pay via PayFast" onPress={() => setShowPayFast(true)} />
+      </View>
+
+      <View>
+        <Button title="Buy via In-App Purchase" onPress={handleInAppPurchase} />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
+  card: { backgroundColor: '#fff', textColor: '#000' },
+  cardContainer: { height: 50, marginBottom: 20 },
+});
+Step 3: Backend notes for Stripe
+You need a backend endpoint (e.g., Node.js/Express) to create a PaymentIntent:
+
+js
+Copy
+Edit
+const express = require('express');
+const app = express();
+const stripe = require('stripe')('sk_test_your_secret_key');
+
+app.use(express.json());
+
+app.post('/create-payment-intent', async (req, res) => {
+  const { amount } = req.body;
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'zar',
+      payment_method_types: ['card'],
+    });
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
+Step 4: Linking purchase to premium unlock & trial logic
+On successful payment (any method), save premium status locally (AsyncStorage or your backend)
+
+Check premium status on app start to unlock content
+
+Implement 3-day free trial timer and countdown notification (later)
+

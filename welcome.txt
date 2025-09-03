@@ -1,0 +1,28 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
+
+export default function WelcomeScreen({ navigation }: Props) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome to EduSA App</Text>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+        <Text style={styles.buttonText}>Login / Signup</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.button, styles.guest]} onPress={() => navigation.navigate('Login', { role: 'guest' })}>
+        <Text style={styles.buttonText}>Continue as Guest</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'#f0e6ff' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 40, color: '#4b0082' },
+  button: { backgroundColor: '#7b5fff', paddingVertical: 14, paddingHorizontal: 40, borderRadius: 25, marginVertical: 10, width: '70%' },
+  guest: { backgroundColor: '#a295ff' },
+  buttonText: { color: 'white', fontWeight: '600', fontSize: 18, textAlign: 'center' },
+});

@@ -1,0 +1,163 @@
+
+Step 1: Install dependencies
+bash
+Copy
+Edit
+npm install axios
+Step 2: Create AIChatScreen.tsx
+tsx
+Copy
+Edit
+import React, { useState, useRef, useEffect } from 'react';
+import { View, TextInput, TouchableOpacity, Text, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import axios from 'axios';
+
+type Message = {
+  id: string;
+  text: string;
+  fromUser: boolean;
+};
+
+export default function AIChatScreen() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const flatListRef = useRef<FlatList>(null);
+
+  const API_KEY = '<YOUR_OPENAI_API_KEY>';
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = { id: Date.now().toString(), text: input.trim(), fromUser: true };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: userMessage.text }],
+          max_tokens: 500,
+          temperature: 0.7,
+        },
+        {
+          headers: { Authorization: `Bearer ${API_KEY}` },
+        }
+      );
+
+      const botMessage: Message = {
+        id: Date.now().toString() + '-bot',
+        text: response.data.choices[0].message.content.trim(),
+        fromUser: false,
+      };
+      setMessages(prev => [...prev, botMessage]);
+
+      // Scroll to bottom after message received
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (error) {
+      const errorMsg: Message = {
+        id: Date.now().toString() + '-error',
+        text: 'Sorry, something went wrong. Please try again later.',
+        fromUser: false,
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={[styles.messageBubble, item.fromUser ? styles.userBubble : styles.botBubble]}>
+            <Text style={item.fromUser ? styles.userText : styles.botText}>{item.text}</Text>
+          </View>
+        )}
+        contentContainerStyle={{ paddingVertical: 10 }}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+      />
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          placeholder="Ask me anything..."
+          value={input}
+          onChangeText={setInput}
+          style={styles.input}
+          multiline
+        />
+        <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Send</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#eef2ff' },
+  messageBubble: {
+    marginVertical: 5,
+    marginHorizontal: 10,
+    padding: 12,
+    borderRadius: 15,
+    maxWidth: '75%',
+  },
+  userBubble: {
+    backgroundColor: '#3f3fff',
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 0,
+  },
+  botBubble: {
+    backgroundColor: '#ddd',
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 0,
+  },
+  userText: {
+    color: 'white',
+  },
+  botText: {
+    color: '#333',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 10,
+    backgroundColor: '#c7d2fe',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 16,
+    maxHeight: 100,
+  },
+  sendButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3f3fff',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    marginLeft: 10,
+  },
+});
+Step 3: Usage
+Replace <YOUR_OPENAI_API_KEY> with your actual OpenAI API key
+
+Add a navigation route to AIChatScreen and link it from your dashboards
+
+The bot responds conversationally, able to generate step-by-step guides, answer questions, and help all grades
+
+Optional: Enhance AI
+You can prepend system messages to tailor the assistant:
+
+js
+Copy
+Edit
+messages: [
+  { role: 'system', content: 'You are a friendly, reliable study assistant for South African students from grade 1 to 12.' },
+  { role: 'user', content: userMessage.text }
+]

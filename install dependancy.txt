@@ -1,0 +1,120 @@
+1expo install expo-notifications expo-permissions
+
+
+2[put in expo config]
+{
+  "expo": {
+    // ... other config ...
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.edusaapp",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
+    },
+    "android": {
+      "package": "com.yourcompany.edusaapp",
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["NOTIFICATIONS"]
+    }
+  }
+}
+
+
+
+3[create a notification.ts helper file]
+
+
+// notifications.ts
+import * as Notifications from 'expo-notifications';
+import * as Permissions from 'expo-permissions';
+import { Platform } from 'react-native';
+
+export async function registerForPushNotificationsAsync() {
+  let token;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  const { status: existingStatus } = await Permissions.getAsync(Permissions.NOTIFICATIONS);
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== 'granted') {
+    const { status } = await Permissions.askAsync(Permissions.NOTIFICATIONS);
+    finalStatus = status;
+  }
+
+  if (finalStatus !== 'granted') {
+    alert('Failed to get push token for push notifications!');
+    return;
+  }
+
+  token = (await Notifications.getExpoPushTokenAsync()).data;
+  console.log('Push Notification Token:', token);
+
+  return token;
+}
+
+
+
+4[use this in your app.tsx or main component]
+
+
+import React, { useEffect, useRef } from 'react';
+import { Alert, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from './notifications';
+
+export default function App() {
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
+
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+
+    // This listener is fired whenever a notification is received while the app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      Alert.alert('New Notification', notification.request.content.body || '');
+    });
+
+    // This listener is fired whenever a user taps on or interacts with a notification
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log(response);
+      // Handle notification tap action here (e.g., navigate to a specific screen)
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
+
+  return (
+    // ... your navigation and app UI ...
+  );
+}
+
+
+
+5[sending push notifications from your backend or via expo posh api]
+
+curl -X POST https://exp.host/--/api/v2/push/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+    "sound": "default",
+    "title": "Study Reminder",
+    "body": "Math exam in 3 days. Start revising now!",
+    "data": {"someData": "goes here"}
+  }'
+
+
